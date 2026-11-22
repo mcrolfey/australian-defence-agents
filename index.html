@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Australian Defence Agents</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+  h1 { margin-bottom: .2rem; }
+  .warn { background: #fff4e5; border-left: 4px solid #f0a020; padding: .7rem 1rem; margin: 1rem 0; }
+  label { display: block; font-weight: 600; margin-top: .9rem; }
+  input, select, textarea { width: 100%; padding: .5rem; font: inherit; box-sizing: border-box; }
+  textarea { min-height: 90px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+  button { margin-top: 1.2rem; padding: .7rem 1.6rem; font-size: 1rem; cursor: pointer; }
+  .step { border: 1px solid #ddd; border-radius: 6px; margin: 1rem 0; }
+  .step h3 { margin: 0; padding: .6rem 1rem; background: #f3f5f8; }
+  .step.final h3 { background: #e3f4e6; }
+  .step pre { white-space: pre-wrap; padding: 0 1rem 1rem; font: inherit; }
+  #status { margin-top: 1rem; color: #555; }
+</style>
+</head>
+<body>
+<h1>Australian Defence Agents</h1>
+<p>Enter your charges. A team of AI agents running on your local LLM analyses the charges and builds a defence plan.</p>
+<div class="warn"><strong>Not legal advice.</strong> __DISCLAIMER__</div>
+
+<form id="f">
+  <label>Charges *</label>
+  <textarea name="charges" required placeholder="e.g. Drive with middle range PCA (0.09); Drive whilst unlicensed"></textarea>
+  <div class="row">
+    <div><label>State / Territory</label><select name="jurisdiction" id="j"></select></div>
+    <div><label>Location / Court</label><input name="location" placeholder="e.g. Parramatta Local Court"></div>
+    <div><label>Your age</label><input name="age" placeholder="e.g. 22"></div>
+  </div>
+  <label>What happened (your side)</label>
+  <textarea name="facts" placeholder="Times, what police did, whether you were cautioned, tests taken, etc."></textarea>
+  <label>Prior record</label>
+  <input name="priors" placeholder="e.g. none / one speeding fine in 2021">
+  <button type="submit" id="go">Analyse my charges</button>
+</form>
+
+<div id="status"></div>
+<div id="out"></div>
+
+<script>
+const sel = document.getElementById('j');
+for (const j of __JURIS__) sel.add(new Option(j, j));
+const out = document.getElementById('out'), status = document.getElementById('status');
+const esc = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+document.getElementById('f').onsubmit = async e => {
+  e.preventDefault();
+  const btn = document.getElementById('go'); btn.disabled = true;
+  out.innerHTML = ''; status.textContent = 'Agents working... (each step can take a minute on a local model)';
+  const res = await fetch('/analyse', { method: 'POST',
+    body: JSON.stringify(Object.fromEntries(new FormData(e.target))) });
+  if (!res.ok) { status.textContent = await res.text(); btn.disabled = false; return; }
+  const reader = res.body.getReader(), dec = new TextDecoder(); let buf = '';
+  while (true) {
+    const { value, done } = await reader.read(); if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let i; while ((i = buf.indexOf('\n')) >= 0) {
+      const msg = JSON.parse(buf.slice(0, i)); buf = buf.slice(i + 1);
+      if (msg.error) status.textContent = msg.error;
+      else if (msg.done) status.textContent = 'Done (model: ' + msg.model + ')';
+      else {
+        const final = msg.agent === 'Case Lead';
+        const html = `<div class="step ${final ? 'final' : ''}"><h3>${esc(msg.agent)}</h3><pre>${esc(msg.output)}</pre></div>`;
+        final ? out.insertAdjacentHTML('afterbegin', html) : out.insertAdjacentHTML('beforeend', html);
+        status.textContent = msg.agent + ' finished...';
+      }
+    }
+  }
+  btn.disabled = false;
+};
+</script>
+</body>
+</html>
