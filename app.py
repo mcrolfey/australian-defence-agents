@@ -9,7 +9,9 @@ import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from agents import DISCLAIMER, JURISDICTIONS, Case, run_case
+from datetime import datetime
+
+from agents import DISCLAIMER, JURISDICTIONS, Case, build_report, run_case
 
 HTML = (Path(__file__).parent / "index.html").read_text(encoding="utf-8")
 CONFIG = {"lm_url": "http://localhost:1234", "model": None}
@@ -45,7 +47,11 @@ class Handler(BaseHTTPRequestHandler):
         try:
             result = run_case(case, CONFIG["lm_url"], CONFIG["model"],
                               on_step=lambda n, t: emit({"agent": n, "output": t}))
-            emit({"done": True, "model": result["model"]})
+            report = build_report(case, result)
+            path = Path(__file__).parent / "reports" / f"defence_report_{datetime.now():%Y%m%d_%H%M%S}.md"
+            path.parent.mkdir(exist_ok=True)
+            path.write_text(report, encoding="utf-8")
+            emit({"done": True, "model": result["model"], "report": report, "saved": str(path)})
         except Exception as e:
             emit({"error": f"Could not reach LM Studio at {CONFIG['lm_url']}: {e}"})
 

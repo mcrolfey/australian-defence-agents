@@ -5,7 +5,10 @@ Command line:
 """
 import argparse
 
-from agents import DISCLAIMER, Case, run_case
+from datetime import datetime
+from pathlib import Path
+
+from agents import Case, build_report, run_case
 
 p = argparse.ArgumentParser()
 p.add_argument("--charges", required=True)
@@ -16,15 +19,14 @@ p.add_argument("--age", default="")
 p.add_argument("--priors", default="")
 p.add_argument("--lm-studio-url", default="http://localhost:1234")
 p.add_argument("--model", default=None)
-p.add_argument("--out", default=None, help="write markdown report here")
+p.add_argument("--out", default=None, help="report path (default: reports/defence_report_<time>.md)")
 a = p.parse_args()
 
 case = Case(a.charges, a.state, a.location, a.facts, a.age, a.priors)
 result = run_case(case, a.lm_studio_url, a.model,
                   on_step=lambda n, t: print(f"\n===== {n} =====\n{t}\n", flush=True))
 
-if a.out:
-    md = [f"# Defence analysis\n\n> {DISCLAIMER}\n\n```\n{case.describe()}\n```\n"]
-    md += [f"## {s['agent']}\n\n{s['output']}\n" for s in result["steps"]]
-    open(a.out, "w", encoding="utf-8").write("\n".join(md))
-    print(f"Saved {a.out}")
+out = Path(a.out or f"reports/defence_report_{datetime.now():%Y%m%d_%H%M%S}.md")
+out.parent.mkdir(parents=True, exist_ok=True)
+out.write_text(build_report(case, result), encoding="utf-8")
+print(f"\nDefence strategy report saved: {out}")

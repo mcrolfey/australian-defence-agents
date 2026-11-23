@@ -41,6 +41,7 @@
 </form>
 
 <div id="status"></div>
+<button id="dl" style="display:none">Download Defence Strategy Report (.md)</button>
 <div id="out"></div>
 
 <script>
@@ -52,7 +53,7 @@ const esc = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c
 document.getElementById('f').onsubmit = async e => {
   e.preventDefault();
   const btn = document.getElementById('go'); btn.disabled = true;
-  out.innerHTML = ''; status.textContent = 'Agents working... (each step can take a minute on a local model)';
+  out.innerHTML = ''; document.getElementById('dl').style.display = 'none'; status.textContent = 'Agents working... (each step can take a minute on a local model)';
   const res = await fetch('/analyse', { method: 'POST',
     body: JSON.stringify(Object.fromEntries(new FormData(e.target))) });
   if (!res.ok) { status.textContent = await res.text(); btn.disabled = false; return; }
@@ -63,10 +64,16 @@ document.getElementById('f').onsubmit = async e => {
     let i; while ((i = buf.indexOf('\n')) >= 0) {
       const msg = JSON.parse(buf.slice(0, i)); buf = buf.slice(i + 1);
       if (msg.error) status.textContent = msg.error;
-      else if (msg.done) status.textContent = 'Done (model: ' + msg.model + ')';
+      else if (msg.done) {
+        status.textContent = 'Done (model: ' + msg.model + '). Report saved to ' + msg.saved;
+        const dl = document.getElementById('dl'); dl.style.display = 'inline-block';
+        dl.onclick = () => { const a = document.createElement('a');
+          a.href = URL.createObjectURL(new Blob([msg.report], {type: 'text/markdown'}));
+          a.download = 'defence_strategy_report.md'; a.click(); };
+      }
       else {
         const final = msg.agent === 'Case Lead';
-        const html = `<div class="step ${final ? 'final' : ''}"><h3>${esc(msg.agent)}</h3><pre>${esc(msg.output)}</pre></div>`;
+        const html = `<div class="step ${final ? 'final' : ''}"><h3>${final ? 'Defence Strategy Report' : esc(msg.agent)}</h3><pre>${esc(msg.output)}</pre></div>`;
         final ? out.insertAdjacentHTML('afterbegin', html) : out.insertAdjacentHTML('beforeend', html);
         status.textContent = msg.agent + ' finished...';
       }

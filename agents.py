@@ -102,11 +102,22 @@ AGENTS = [
           "jurisdiction law, overconfident claims, weak arguments, and important things "
           "missed. Be blunt and specific.", 1500),
     Agent("Case Lead",
-          "Write the final defence plan using everything above and the Critic's corrections. "
-          "Structure: 1) Summary of charges and realistic risk, 2) Best defence arguments "
-          "(ranked), 3) Evidence/procedure issues to pursue, 4) Paths to avoid a conviction, "
-          "5) Step-by-step actions before the court date, 6) Questions to ask a lawyer. "
-          "Be honest about the chance of success.", 3500),
+          "Write the DEFENCE STRATEGY REPORT, using everything above and applying the Critic's "
+          "corrections. The goal is to get the charges withdrawn, dismissed or defended "
+          "successfully, and failing that to avoid a conviction being recorded. Use exactly "
+          "these markdown headings:\n"
+          "## 1. Charges and Elements (table: charge | legislation | max penalty | elements)\n"
+          "## 2. Primary Defence Strategy (the single best route out of the charges and why)\n"
+          "## 3. Ranked Defence Arguments (for each: argument, legal basis, evidence needed, "
+          "strength High/Medium/Low)\n"
+          "## 4. Getting the Charges Withdrawn or Downgraded (what to put in representations "
+          "to police/prosecution)\n"
+          "## 5. Evidence to Challenge or Exclude\n"
+          "## 6. Fallback: Avoiding a Conviction (diversion, dismissal, no conviction recorded)\n"
+          "## 7. Action Plan and Timeline (numbered steps before each court date)\n"
+          "## 8. Documents and Evidence Checklist\n"
+          "## 9. Questions for Your Lawyer\n"
+          "## 10. Realistic Assessment (honest likelihood of each outcome)", 4000),
 ]
 
 
@@ -169,3 +180,24 @@ def run_case(case: Case, base_url: str = "http://localhost:1234", model: str | N
         "final": notes[-1][1],
         "disclaimer": DISCLAIMER,
     }
+
+
+def build_report(case: Case, result: dict) -> str:
+    """Markdown defence strategy report: final plan first, agent working notes as appendix."""
+    from datetime import date
+    out = [
+        "# Defence Strategy Report",
+        f"_Generated {date.today():%d %B %Y} by Australian Defence Agents (model: {result['model']})_",
+        f"> **Not legal advice.** {DISCLAIMER}",
+        "## Case Details\n\n"
+        f"- **Charges:** {case.charges}\n"
+        f"- **Jurisdiction:** {case.jurisdiction}\n"
+        f"- **Location / Court:** {case.location or 'not stated'}\n"
+        f"- **Age:** {case.age or 'not stated'}\n"
+        f"- **Prior record:** {case.priors or 'not stated'}\n"
+        f"- **Facts provided:** {case.facts or 'not provided'}",
+        result["final"],
+        "---\n# Appendix: Agent Working Notes",
+    ]
+    out += [f"## {s['agent']}\n\n{s['output']}" for s in result["steps"][:-1]]
+    return "\n\n".join(out) + "\n"
